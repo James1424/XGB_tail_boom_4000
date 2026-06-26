@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .model_config import MODEL_PARAMS, OUTPUT_FILES, README_FILE, TARGET_LABEL
+from .model_config import MAIN_WEIGHT_PROFILE, MODEL_PARAMS, OUTPUT_FILES, README_FILE, TARGET_LABEL
 
 PERCENT_HINTS = (
     "return", "rate", "precision", "hit", "probability", "score", "weight", "mean", "std", "min", "max", "importance",
@@ -79,6 +79,7 @@ def main():
     curve = read_csv(OUTPUT_FILES["training_curve"])
     five_imp = read_csv(OUTPUT_FILES["five_seed_feature_importance"])
     manual_weights = read_csv(OUTPUT_FILES["manual_feature_weights"])
+    weight_ablation = read_csv(OUTPUT_FILES["feature_weight_ablation"])
 
     metrics = {}
     if OUTPUT_FILES["metrics_json"].exists():
@@ -94,6 +95,8 @@ This repository builds the ETF/index monthly panel and immediately trains a righ
 Core target: `{TARGET_LABEL}`. A positive label means future 1–3 month max return is in the monthly top 10% and at least +30%.
 
 ## Model parameters
+
+Main feature-weight profile: `{MAIN_WEIGHT_PROFILE}`.
 
 ```json
 {params_block()}
@@ -138,6 +141,12 @@ Latest month candidates are ranked by an ensemble of the main model and five-see
 
 {md_table(latest, max_rows=30, cols=['rank','month','ticker','ensemble_score','xgb_boom_probability','five_seed_avg_score','five_seed_score_std','mom_6m','mom_3m','rel_mom_6m_vs_qqq','liquid_vol_score','avg_dollar_volume_3m'])}
 
+## Feature weight profile ablation
+
+This section compares three manual XGBoost `feature_weights` profiles. Baseline uses the original mild core-momentum boost; boosted is the main model profile; aggressive tests whether core momentum is being over-emphasized. The table is sorted by `total_return_1m_rebalanced`, then monthly return, then future max return.
+
+{md_table(weight_ablation, max_rows=10, cols=['weight_profile','is_main_profile','core_momentum_weight','relative_strength_weight','volatility_frequency_weight','etf_source_weight','months','total_return_1m_rebalanced','annualized_return_1m_rebalanced','avg_monthly_return_1m','avg_future_max_return_1_3m','avg_boom_hit_rate','prauc','auc','precision_at_top3','top3_hit30_rate','top3_hit50_rate','monthly_any_top3_hit50_rate'])}
+
 ## Strategy and baseline comparison
 
 `xgb_boom_probability` is computed on model prediction rows. `baseline_*` strategies are computed independently on the full clean test panel, requiring only the baseline score column and future-return labels. This keeps baseline returns fixed when model feature sets change.
@@ -178,6 +187,7 @@ outputs/training_curve_metrics_every_100_rounds.csv
 outputs/reference_downweighted_main_model_result.csv
 outputs/latest_live_boom_candidates.csv
 outputs/strategy_baseline_comparison.csv
+outputs/feature_weight_ablation_summary.csv
 outputs/recent_xgb_top3_backtest_months.csv
 outputs/ablation_ranked_summary.csv
 outputs/five_seed_training_stability.csv

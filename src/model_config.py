@@ -72,19 +72,52 @@ ABLATION_GROUPS = {
 }
 
 # Manual feature weights passed to XGBoost through feature_weights.
-FEATURE_GROUP_WEIGHTS = {
-    "core_momentum": 1.25,
-    "relative_strength": 1.15,
-    "volatility_frequency": 1.15,
-    "liquidity_size": 1.10,
-    "other_momentum": 1.05,
-    "trend": 1.00,
-    "risk_drawdown": 1.00,
-    "volume_flow": 0.95,
-    "qqq_context": 0.95,
-    "etf_source": 0.90,
-    "unclassified": 1.00,
+# Main model uses momentum_boosted because this project is designed to detect
+# 1-3 month right-tail boom events, where core momentum should be the dominant
+# prior but not the only signal.
+FEATURE_WEIGHT_PROFILES = {
+    "balanced_original": {
+        "core_momentum": 1.25,
+        "relative_strength": 1.15,
+        "volatility_frequency": 1.15,
+        "liquidity_size": 1.10,
+        "other_momentum": 1.05,
+        "trend": 1.00,
+        "risk_drawdown": 1.00,
+        "volume_flow": 0.95,
+        "qqq_context": 0.95,
+        "etf_source": 0.90,
+        "unclassified": 1.00,
+    },
+    "momentum_boosted": {
+        "core_momentum": 1.60,
+        "relative_strength": 1.25,
+        "volatility_frequency": 1.20,
+        "liquidity_size": 1.10,
+        "other_momentum": 1.10,
+        "trend": 1.00,
+        "risk_drawdown": 0.95,
+        "volume_flow": 0.95,
+        "qqq_context": 0.90,
+        "etf_source": 0.85,
+        "unclassified": 1.00,
+    },
+    "momentum_aggressive": {
+        "core_momentum": 2.00,
+        "relative_strength": 1.35,
+        "volatility_frequency": 1.25,
+        "liquidity_size": 1.10,
+        "other_momentum": 1.10,
+        "trend": 1.00,
+        "risk_drawdown": 0.90,
+        "volume_flow": 0.90,
+        "qqq_context": 0.85,
+        "etf_source": 0.80,
+        "unclassified": 1.00,
+    },
 }
+MAIN_WEIGHT_PROFILE = "momentum_boosted"
+FEATURE_GROUP_WEIGHTS = FEATURE_WEIGHT_PROFILES[MAIN_WEIGHT_PROFILE]
 
 OUTPUT_FILES = {
     "final_metrics": OUTPUT_DIR / "final_train_validation_test_metrics.csv",
@@ -97,6 +130,7 @@ OUTPUT_FILES = {
     "training_curve": OUTPUT_DIR / "training_curve_metrics_every_100_rounds.csv",
     "five_seed_feature_importance": OUTPUT_DIR / "five_seed_average_feature_importance.csv",
     "manual_feature_weights": OUTPUT_DIR / "manual_feature_weights_used_by_xgboost.csv",
+    "feature_weight_ablation": OUTPUT_DIR / "feature_weight_ablation_summary.csv",
     "monthly_top": OUTPUT_DIR / "monthly_top_predictions.csv",
     "full_predictions": OUTPUT_DIR / "full_predictions.csv",
     "metrics_json": OUTPUT_DIR / "model_metrics.json",

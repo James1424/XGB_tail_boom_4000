@@ -10,6 +10,8 @@ from xgboost import XGBClassifier
 from .model_config import (
     ABLATION_GROUPS,
     FEATURE_GROUP_WEIGHTS,
+    FEATURE_WEIGHT_PROFILES,
+    MAIN_WEIGHT_PROFILE,
     FEATURE_LIST_FILE,
     MAIN_MODEL_FILE,
     MAIN_SEEDS,
@@ -46,8 +48,9 @@ def feature_group(feature: str) -> str:
     return "unclassified"
 
 
-def manual_feature_weight(feature: str) -> float:
-    return float(FEATURE_GROUP_WEIGHTS.get(feature_group(feature), FEATURE_GROUP_WEIGHTS["unclassified"]))
+def manual_feature_weight(feature: str, group_weights: dict | None = None) -> float:
+    weights = FEATURE_GROUP_WEIGHTS if group_weights is None else group_weights
+    return float(weights.get(feature_group(feature), weights.get("unclassified", 1.0)))
 
 
 def feature_tier(weight: float) -> str:
@@ -60,10 +63,10 @@ def feature_tier(weight: float) -> str:
     return "tier_4_downweighted_context"
 
 
-def manual_feature_weight_table(features: list[str]) -> pd.DataFrame:
+def manual_feature_weight_table(features: list[str], group_weights: dict | None = None) -> pd.DataFrame:
     rows = []
     for i, f in enumerate(features, start=1):
-        w = manual_feature_weight(f)
+        w = manual_feature_weight(f, group_weights=group_weights)
         rows.append({
             "index": i,
             "feature": f,
@@ -95,7 +98,14 @@ def make_reference_downweighted_weights(df: pd.DataFrame, target_col: str = TARG
     return w
 
 
-def fit_xgb(train: pd.DataFrame, valid: pd.DataFrame, features: list[str], seed: int, params: dict | None = None) -> XGBClassifier:
+def fit_xgb(
+    train: pd.DataFrame,
+    valid: pd.DataFrame,
+    features: list[str],
+    seed: int,
+    params: dict | None = None,
+    group_weights: dict | None = None,
+) -> XGBClassifier:
     p = dict(MODEL_PARAMS if params is None else params)
     p["random_state"] = seed
     model = XGBClassifier(**p)
@@ -104,7 +114,7 @@ def fit_xgb(train: pd.DataFrame, valid: pd.DataFrame, features: list[str], seed:
     w_train = make_reference_downweighted_weights(train)
     X_valid = valid[features].replace([np.inf, -np.inf], np.nan)
     y_valid = valid[TARGET_LABEL].astype(int)
-    fweights = np.array([manual_feature_weight(f) for f in features], dtype=float)
+    fweights = np.array([manual_feature_weight(f, group_weights=group_weights) for f in features], dtype=float)
     try:
         model.fit(
             X_train,
@@ -115,6 +125,7 @@ def fit_xgb(train: pd.DataFrame, valid: pd.DataFrame, features: list[str], seed:
             verbose=False,
         )
     except TypeError:
+        # Older xgboost builds may not expose feature_weights in the sklearn wrapper.
         model.fit(X_train, y_train, sample_weight=w_train, eval_set=[(X_valid, y_valid)], verbose=False)
     return model
 
@@ -149,6 +160,7 @@ def training_curve_every_100_rounds(model: XGBClassifier, train, valid, test, fe
         for dataset, df in datasets:
             pred = predict(model, df, features, SCORE_COL, rounds=r)
             row = {"boosting_round": r, "dataset": dataset}
+            # Keep this compact: PR-AUC/AUC and Top-3 tail behavior are the most useful curve diagnostics.
             m = dataset_metrics(pred, SCORE_COL, dataset)
             for key in [
                 "prauc", "auc", "precision_at_top3", "top3_hit30_rate", "top3_hit50_rate",
@@ -169,6 +181,7 @@ def train_main(train, valid, test, latest, features):
     main_result = {
         "model": "reference_downweighted_xgb_classifier",
         "target": TARGET_LABEL,
+        "main_weight_profile": MAIN_WEIGHT_PROFILE,
         "train_rows": int(len(train)),
         "valid_rows": int(len(valid)),
         "test_rows": int(len(test)),
@@ -182,13 +195,25 @@ def train_main(train, valid, test, latest, features):
     return model, pred_train, pred_valid, pred_test, pred_latest, final_metrics, main_result
 
 
+def sort_strategy_table(out: pd.DataFrame) -> pd.DataFrame:
+    sort_cols = [
+        "total_return_1m_rebalanced",
+        "avg_monthly_return_1m",
+        "avg_future_max_return_1_3m",
+        "avg_boom_hit_rate",
+    ]
+    sort_cols = [c for c in sort_cols if c in out.columns]
+    if sort_cols:
+        out = out.sort_values(sort_cols, ascending=[False] * len(sort_cols), na_position="last").reset_index(drop=True)
+    return out
+
+
 def baseline_comparison(test_full: pd.DataFrame, test_pred: pd.DataFrame) -> pd.DataFrame:
     """Compare XGB Top-3 with independent full-universe baseline Top-3 strategies.
 
-    XGB uses the model prediction score on prediction rows. Each baseline is recomputed
-    independently on the full clean test panel using only its own score column. The final
-    comparison table is sorted by realized 1-month rebalanced total return, then by
-    average monthly 1-month return, then by average 1-3 month future max return.
+    XGB uses model predictions. Each baseline is recomputed independently on the
+    full clean test panel using only its own score column. The comparison table
+    is sorted by realized 1-month rebalanced total return first.
     """
     rows = [strategy_return_row("xgb_boom_probability", test_pred, SCORE_COL, k=3)]
     baselines = {
@@ -206,18 +231,33 @@ def baseline_comparison(test_full: pd.DataFrame, test_pred: pd.DataFrame) -> pd.
             tmp = test_full.copy()
             tmp[col] = tmp[col].fillna(tmp[col].median())
             rows.append(strategy_return_row(name, tmp, col, k=3))
+    return sort_strategy_table(pd.DataFrame(rows))
 
+
+def feature_weight_ablation_summary(train, valid, test, features) -> pd.DataFrame:
+    """Train one seed per manual feature-weight profile and compare Top-3 outcomes.
+
+    This tests whether giving core_momentum a stronger XGBoost feature-sampling
+    prior improves realized Top-3 returns and right-tail capture.
+    """
+    rows = []
+    for profile_name, group_weights in FEATURE_WEIGHT_PROFILES.items():
+        m = fit_xgb(train, valid, features, seed=42, params=MODEL_PARAMS, group_weights=group_weights)
+        score_col = f"weight_profile_{profile_name}_score"
+        pt = predict(m, test, features, score_col)
+        row = {
+            "weight_profile": profile_name,
+            "is_main_profile": profile_name == MAIN_WEIGHT_PROFILE,
+            "core_momentum_weight": group_weights.get("core_momentum", 1.0),
+            "relative_strength_weight": group_weights.get("relative_strength", 1.0),
+            "volatility_frequency_weight": group_weights.get("volatility_frequency", 1.0),
+            "etf_source_weight": group_weights.get("etf_source", 1.0),
+        }
+        row.update(strategy_return_row(profile_name, pt, score_col, k=3))
+        row.update(topk_metrics(pt, score_col, TARGET_LABEL))
+        rows.append(row)
     out = pd.DataFrame(rows)
-    sort_cols = [
-        "total_return_1m_rebalanced",
-        "avg_monthly_return_1m",
-        "avg_future_max_return_1_3m",
-        "avg_boom_hit_rate",
-    ]
-    sort_cols = [c for c in sort_cols if c in out.columns]
-    if sort_cols:
-        out = out.sort_values(sort_cols, ascending=[False] * len(sort_cols), na_position="last").reset_index(drop=True)
-    return out
+    return sort_strategy_table(out)
 
 
 def five_seed_stability_and_importance(train, valid, test, latest, features):
@@ -240,6 +280,10 @@ def five_seed_stability_and_importance(train, valid, test, latest, features):
     latest_scores["five_seed_score_std"] = latest_scores[seed_cols].std(axis=1)
 
     imp_mat = pd.concat(importances, axis=1)
+    # Manual weights also have an original feature-order column named "index".
+    # Drop it before merging, then create a fresh rank index after sorting by
+    # five-seed mean importance. Otherwise pandas raises:
+    # ValueError: cannot insert index, already exists.
     weights = manual_feature_weight_table(features).drop(columns=["index"], errors="ignore")
     imp = pd.DataFrame({
         "feature": imp_mat.index,
@@ -323,6 +367,9 @@ def main():
     baseline = baseline_comparison(test, pred_test)
     baseline.to_csv(OUTPUT_FILES["strategy_baseline"], index=False)
 
+    weight_ablation = feature_weight_ablation_summary(train, valid, test, features)
+    weight_ablation.to_csv(OUTPUT_FILES["feature_weight_ablation"], index=False)
+
     five_report, five_latest, five_imp = five_seed_stability_and_importance(train, valid, test, latest, features)
     five_report.to_csv(OUTPUT_FILES["five_seed"], index=False)
     five_imp.to_csv(OUTPUT_FILES["five_seed_feature_importance"], index=False)
@@ -346,24 +393,19 @@ def main():
 
     metrics_json = {
         "target_label": TARGET_LABEL,
+        "main_weight_profile": MAIN_WEIGHT_PROFILE,
+        "feature_group_weights": FEATURE_GROUP_WEIGHTS,
         "model_params": MODEL_PARAMS,
         "features": features,
         "main_result": main_result,
         "train_rows": len(train),
         "valid_rows": len(valid),
         "test_rows": len(test),
-        "latest_month": str(latest["month"].max().date()) if not latest.empty else None,
-        "strategy_comparison_sort_order": [
-            "total_return_1m_rebalanced desc",
-            "avg_monthly_return_1m desc",
-            "avg_future_max_return_1_3m desc",
-            "avg_boom_hit_rate desc",
-        ],
+        "latest_month": str(latest["month"].max().date()),
+        "training_curve_rounds": TRAINING_CURVE_ROUNDS,
     }
-    with open(OUTPUT_FILES["metrics_json"], "w", encoding="utf-8") as f:
-        json.dump(metrics_json, f, indent=2, default=str)
-
-    print("Training complete. Reports written to outputs/ and model saved to models/.")
+    OUTPUT_FILES["metrics_json"].write_text(json.dumps(metrics_json, indent=2), encoding="utf-8")
+    print("Training complete. Key outputs written to outputs/ and models/.")
 
 
 if __name__ == "__main__":
