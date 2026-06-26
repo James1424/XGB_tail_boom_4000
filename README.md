@@ -40,6 +40,10 @@ GitHub Actions workflow:
 Build Panel and Train Tail Boom Model
 ```
 
+## README archive
+
+Every successful workflow run saves a numbered copy of the generated root `README.md` into `readme_archive/`. The archive index is stored at `readme_archive/README_ARCHIVE_INDEX.md`, with files named like `README_0001_YYYYMMDD_HHMMSS_UTC.md`.
+
 ## Leakage rule
 
 The following columns must never be used as model inputs: `future_return_*`, `future_max_return_1_3m`, `future_max_return_1_3m_pct_rank`, monthly thresholds, and every `label_*` column. The training code automatically excludes them and only keeps numeric feature columns.
