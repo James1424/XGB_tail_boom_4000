@@ -58,6 +58,43 @@ MODEL_PARAMS = {
     "tree_method": "hist",
 }
 
+# Hyperparameter ablation profiles. These are trained only for comparison in
+# outputs/hyperparameter_ablation_summary.csv. The main production model keeps
+# MODEL_PARAMS above unless you manually change MODEL_PARAMS.
+#
+# The deep/slow profiles test whether more trees, deeper interactions, and a
+# lower learning rate can learn subtler right-tail boom signals beyond the
+# current reference configuration.
+HYPERPARAMETER_ABLATION_PROFILES = {
+    "reference_2000_d4_lr0015": dict(MODEL_PARAMS),
+    "deep_slow_4000_d5_lr0008": {
+        **MODEL_PARAMS,
+        "n_estimators": 4000,
+        "max_depth": 5,
+        "learning_rate": 0.008,
+        "min_child_weight": 3,
+        "reg_lambda": 2.00,
+        "subsample": 0.85,
+        "colsample_bytree": 0.90,
+        "colsample_bylevel": 0.85,
+        "colsample_bynode": 0.85,
+    },
+    "deeper_slower_6000_d6_lr0005": {
+        **MODEL_PARAMS,
+        "n_estimators": 6000,
+        "max_depth": 6,
+        "learning_rate": 0.005,
+        "min_child_weight": 3,
+        "reg_alpha": 0.08,
+        "reg_lambda": 2.50,
+        "subsample": 0.82,
+        "colsample_bytree": 0.85,
+        "colsample_bylevel": 0.82,
+        "colsample_bynode": 0.82,
+    },
+}
+
+
 ABLATION_GROUPS = {
     "core_momentum": ["mom_4m", "mom_5m", "mom_6m", "core_mom_456", "mom_6m_"],
     "other_momentum": ["mom_1m", "mom_2m", "mom_3m", "mom_7m", "mom_9m", "mom_12m"],
@@ -198,6 +235,7 @@ OUTPUT_FILES = {
     "five_seed_feature_importance": OUTPUT_DIR / "five_seed_average_feature_importance.csv",
     "manual_feature_weights": OUTPUT_DIR / "manual_feature_weights_used_by_xgboost.csv",
     "feature_weight_ablation": OUTPUT_DIR / "feature_weight_ablation_summary.csv",
+    "hyperparameter_ablation": OUTPUT_DIR / "hyperparameter_ablation_summary.csv",
     "monthly_top": OUTPUT_DIR / "monthly_top_predictions.csv",
     "full_predictions": OUTPUT_DIR / "full_predictions.csv",
     "metrics_json": OUTPUT_DIR / "model_metrics.json",

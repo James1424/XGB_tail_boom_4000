@@ -80,6 +80,7 @@ def main():
     five_imp = read_csv(OUTPUT_FILES["five_seed_feature_importance"])
     manual_weights = read_csv(OUTPUT_FILES["manual_feature_weights"])
     weight_ablation = read_csv(OUTPUT_FILES["feature_weight_ablation"])
+    hyperparam_ablation = read_csv(OUTPUT_FILES["hyperparameter_ablation"])
 
     metrics = {}
     if OUTPUT_FILES["metrics_json"].exists():
@@ -143,9 +144,15 @@ Latest month candidates are ranked by an ensemble of the main model and five-see
 
 ## Feature weight profile ablation
 
-This section compares three manual XGBoost `feature_weights` profiles. Baseline uses the original mild core-momentum boost; boosted is the main model profile; aggressive tests whether core momentum is being over-emphasized. The table is sorted by `total_return_1m_rebalanced`, then monthly return, then future max return.
+This section compares manual XGBoost `feature_weights` profiles. The heavier profiles test whether the strong standalone 4m / 5m / 6m / 456 momentum baselines should receive a much stronger feature-sampling prior. The table is sorted by `total_return_1m_rebalanced`, then monthly return, then future max return.
 
-{md_table(weight_ablation, max_rows=10, cols=['weight_profile','is_main_profile','core_momentum_weight','relative_strength_weight','volatility_frequency_weight','etf_source_weight','months','total_return_1m_rebalanced','annualized_return_1m_rebalanced','avg_monthly_return_1m','avg_future_max_return_1_3m','avg_boom_hit_rate','prauc','auc','precision_at_top3','top3_hit30_rate','top3_hit50_rate','monthly_any_top3_hit50_rate'])}
+{md_table(weight_ablation, max_rows=20, cols=['weight_profile','is_main_profile','core_momentum_group_weight','mom_4m_weight','mom_5m_weight','mom_6m_weight','core_mom_456_avg_weight','mom_6m_acceleration_weight','months','total_return_1m_rebalanced','annualized_return_1m_rebalanced','avg_monthly_return_1m','avg_future_max_return_1_3m','avg_boom_hit_rate','prauc','auc','precision_at_top3','top3_hit30_rate','top3_hit50_rate','monthly_any_top3_hit50_rate'])}
+
+## Hyperparameter ablation: deeper trees, more rounds, lower learning rate
+
+This section tests whether a deeper and slower XGBoost can learn subtler pre-boom interactions. All rows use the same features and the same main feature-weight profile; only the XGBoost hyperparameters change. The table is sorted by realized strategy performance.
+
+{md_table(hyperparam_ablation, max_rows=10, cols=['param_profile','is_main_params','n_estimators','max_depth','learning_rate','min_child_weight','reg_alpha','reg_lambda','subsample','colsample_bytree','months','total_return_1m_rebalanced','annualized_return_1m_rebalanced','avg_monthly_return_1m','avg_future_max_return_1_3m','avg_boom_hit_rate','prauc','auc','precision_at_top3','top3_hit30_rate','top3_hit50_rate','monthly_any_top3_hit50_rate'])}
 
 ## Strategy and baseline comparison
 
@@ -188,6 +195,7 @@ outputs/reference_downweighted_main_model_result.csv
 outputs/latest_live_boom_candidates.csv
 outputs/strategy_baseline_comparison.csv
 outputs/feature_weight_ablation_summary.csv
+outputs/hyperparameter_ablation_summary.csv
 outputs/recent_xgb_top3_backtest_months.csv
 outputs/ablation_ranked_summary.csv
 outputs/five_seed_training_stability.csv

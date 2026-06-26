@@ -11,6 +11,7 @@ from .model_config import (
     ABLATION_GROUPS,
     FEATURE_GROUP_WEIGHTS,
     FEATURE_WEIGHT_PROFILES,
+    HYPERPARAMETER_ABLATION_PROFILES,
     MAIN_WEIGHT_PROFILE,
     FEATURE_LIST_FILE,
     MAIN_MODEL_FILE,
@@ -268,6 +269,46 @@ def feature_weight_ablation_summary(train, valid, test, features) -> pd.DataFram
     return sort_strategy_table(out)
 
 
+def hyperparameter_ablation_summary(train, valid, test, features) -> pd.DataFrame:
+    """Compare deeper/slower XGBoost parameter profiles on the same features and weights.
+
+    This tests the user's hypothesis that more boosting rounds, deeper trees,
+    and a lower learning rate may learn finer right-tail boom patterns. It uses
+    the main feature-weight profile for all rows so the only changing factor is
+    the XGBoost hyperparameter profile.
+    """
+    rows = []
+    for profile_name, params in HYPERPARAMETER_ABLATION_PROFILES.items():
+        m = fit_xgb(
+            train,
+            valid,
+            features,
+            seed=42,
+            params=params,
+            group_weights=FEATURE_GROUP_WEIGHTS,
+        )
+        score_col = f"param_profile_{profile_name}_score"
+        pt = predict(m, test, features, score_col)
+        row = {
+            "param_profile": profile_name,
+            "is_main_params": profile_name == "reference_2000_d4_lr0015",
+            "n_estimators": params.get("n_estimators"),
+            "max_depth": params.get("max_depth"),
+            "learning_rate": params.get("learning_rate"),
+            "min_child_weight": params.get("min_child_weight"),
+            "reg_alpha": params.get("reg_alpha"),
+            "reg_lambda": params.get("reg_lambda"),
+            "subsample": params.get("subsample"),
+            "colsample_bytree": params.get("colsample_bytree"),
+            "colsample_bylevel": params.get("colsample_bylevel"),
+            "colsample_bynode": params.get("colsample_bynode"),
+        }
+        row.update(strategy_return_row(profile_name, pt, score_col, k=3))
+        row.update(topk_metrics(pt, score_col, TARGET_LABEL))
+        rows.append(row)
+    return sort_strategy_table(pd.DataFrame(rows))
+
+
 def five_seed_stability_and_importance(train, valid, test, latest, features):
     rows = []
     latest_scores = latest[["month", "ticker"]].copy()
@@ -351,6 +392,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rounds", type=int, default=100, help="Deprecated: kept for workflow compatibility. Training curve uses every 100 boosting rounds.")
     parser.add_argument("--skip-ablation", action="store_true")
+    parser.add_argument("--skip-hyperparam-ablation", action="store_true", help="Skip the slower deep-tree hyperparameter ablation.")
     parser.add_argument("--skip-rounds", action="store_true", help="Deprecated: kept for compatibility; ignored.")
     args = parser.parse_args()
 
@@ -377,6 +419,12 @@ def main():
 
     weight_ablation = feature_weight_ablation_summary(train, valid, test, features)
     weight_ablation.to_csv(OUTPUT_FILES["feature_weight_ablation"], index=False)
+
+    if not args.skip_hyperparam_ablation:
+        hp_ablation = hyperparameter_ablation_summary(train, valid, test, features)
+        hp_ablation.to_csv(OUTPUT_FILES["hyperparameter_ablation"], index=False)
+    else:
+        pd.DataFrame().to_csv(OUTPUT_FILES["hyperparameter_ablation"], index=False)
 
     five_report, five_latest, five_imp = five_seed_stability_and_importance(train, valid, test, latest, features)
     five_report.to_csv(OUTPUT_FILES["five_seed"], index=False)
@@ -411,6 +459,7 @@ def main():
         "test_rows": len(test),
         "latest_month": str(latest["month"].max().date()),
         "training_curve_rounds": TRAINING_CURVE_ROUNDS,
+        "hyperparameter_ablation_profiles": HYPERPARAMETER_ABLATION_PROFILES,
     }
     OUTPUT_FILES["metrics_json"].write_text(json.dumps(metrics_json, indent=2), encoding="utf-8")
     print("Training complete. Key outputs written to outputs/ and models/.")
