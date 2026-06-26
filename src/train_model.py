@@ -115,7 +115,6 @@ def fit_xgb(train: pd.DataFrame, valid: pd.DataFrame, features: list[str], seed:
             verbose=False,
         )
     except TypeError:
-        # Older xgboost builds may not expose feature_weights in the sklearn wrapper.
         model.fit(X_train, y_train, sample_weight=w_train, eval_set=[(X_valid, y_valid)], verbose=False)
     return model
 
@@ -150,7 +149,6 @@ def training_curve_every_100_rounds(model: XGBClassifier, train, valid, test, fe
         for dataset, df in datasets:
             pred = predict(model, df, features, SCORE_COL, rounds=r)
             row = {"boosting_round": r, "dataset": dataset}
-            # Keep this compact: PR-AUC/AUC and Top-3 tail behavior are the most useful curve diagnostics.
             m = dataset_metrics(pred, SCORE_COL, dataset)
             for key in [
                 "prauc", "auc", "precision_at_top3", "top3_hit30_rate", "top3_hit50_rate",
@@ -185,6 +183,13 @@ def train_main(train, valid, test, latest, features):
 
 
 def baseline_comparison(test_full: pd.DataFrame, test_pred: pd.DataFrame) -> pd.DataFrame:
+    """Compare XGB Top-3 with independent full-universe baseline Top-3 strategies.
+
+    XGB uses the model prediction score on prediction rows. Each baseline is recomputed
+    independently on the full clean test panel using only its own score column. The final
+    comparison table is sorted by realized 1-month rebalanced total return, then by
+    average monthly 1-month return, then by average 1-3 month future max return.
+    """
     rows = [strategy_return_row("xgb_boom_probability", test_pred, SCORE_COL, k=3)]
     baselines = {
         "baseline_mom_3m": "mom_3m",
@@ -201,7 +206,18 @@ def baseline_comparison(test_full: pd.DataFrame, test_pred: pd.DataFrame) -> pd.
             tmp = test_full.copy()
             tmp[col] = tmp[col].fillna(tmp[col].median())
             rows.append(strategy_return_row(name, tmp, col, k=3))
-    return pd.DataFrame(rows)
+
+    out = pd.DataFrame(rows)
+    sort_cols = [
+        "total_return_1m_rebalanced",
+        "avg_monthly_return_1m",
+        "avg_future_max_return_1_3m",
+        "avg_boom_hit_rate",
+    ]
+    sort_cols = [c for c in sort_cols if c in out.columns]
+    if sort_cols:
+        out = out.sort_values(sort_cols, ascending=[False] * len(sort_cols), na_position="last").reset_index(drop=True)
+    return out
 
 
 def five_seed_stability_and_importance(train, valid, test, latest, features):
@@ -224,10 +240,6 @@ def five_seed_stability_and_importance(train, valid, test, latest, features):
     latest_scores["five_seed_score_std"] = latest_scores[seed_cols].std(axis=1)
 
     imp_mat = pd.concat(importances, axis=1)
-    # Manual weights also have an original feature-order column named "index".
-    # Drop it before merging, then create a fresh rank index after sorting by
-    # five-seed mean importance. Otherwise pandas raises:
-    # ValueError: cannot insert index, already exists.
     weights = manual_feature_weight_table(features).drop(columns=["index"], errors="ignore")
     imp = pd.DataFrame({
         "feature": imp_mat.index,
@@ -340,11 +352,18 @@ def main():
         "train_rows": len(train),
         "valid_rows": len(valid),
         "test_rows": len(test),
-        "latest_month": str(latest["month"].max().date()),
-        "training_curve_rounds": TRAINING_CURVE_ROUNDS,
+        "latest_month": str(latest["month"].max().date()) if not latest.empty else None,
+        "strategy_comparison_sort_order": [
+            "total_return_1m_rebalanced desc",
+            "avg_monthly_return_1m desc",
+            "avg_future_max_return_1_3m desc",
+            "avg_boom_hit_rate desc",
+        ],
     }
-    OUTPUT_FILES["metrics_json"].write_text(json.dumps(metrics_json, indent=2), encoding="utf-8")
-    print("Training complete. Key outputs written to outputs/ and models/.")
+    with open(OUTPUT_FILES["metrics_json"], "w", encoding="utf-8") as f:
+        json.dump(metrics_json, f, indent=2, default=str)
+
+    print("Training complete. Reports written to outputs/ and model saved to models/.")
 
 
 if __name__ == "__main__":
