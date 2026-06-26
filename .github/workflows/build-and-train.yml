@@ -112,6 +112,7 @@ jobs:
             outputs/reference_downweighted_main_model_result.csv
             outputs/latest_live_boom_candidates.csv
             outputs/strategy_baseline_comparison.csv
+            outputs/feature_weight_ablation_summary.csv
             outputs/recent_xgb_top3_backtest_months.csv
             outputs/ablation_ranked_summary.csv
             outputs/five_seed_training_stability.csv
