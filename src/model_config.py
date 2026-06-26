@@ -37,20 +37,26 @@ TEST_START = "2024-01-01"
 
 TOP_KS = [3, 5, 10]
 MAIN_SEEDS = [7, 42, 202, 777, 2026]
-TRAINING_CURVE_ROUNDS = list(range(100, 2001, 100))
+TRAINING_CURVE_ROUNDS = list(range(100, 4001, 100))
 
-# User-requested main model configuration.
+# Main model configuration.
+#
+# Previous ablations showed that the deep/slow 4000-round configuration beat
+# both the old 2000-round reference and the 6000-round stress test on realized
+# Top-3 strategy return. Therefore the production baseline is now fixed at
+# 4000 trees, depth 5, learning_rate 0.008. Future ablations should test around
+# this baseline instead of treating 2000 rounds as the reference.
 MODEL_PARAMS = {
-    "n_estimators": 2000,
-    "max_depth": 4,
-    "learning_rate": 0.015,
+    "n_estimators": 4000,
+    "max_depth": 5,
+    "learning_rate": 0.008,
     "subsample": 0.85,
     "colsample_bytree": 0.90,
     "colsample_bylevel": 0.85,
     "colsample_bynode": 0.85,
-    "min_child_weight": 4,
+    "min_child_weight": 3,
     "reg_alpha": 0.05,
-    "reg_lambda": 1.50,
+    "reg_lambda": 2.00,
     "objective": "binary:logistic",
     "eval_metric": "aucpr",
     "random_state": 42,
@@ -59,38 +65,33 @@ MODEL_PARAMS = {
 }
 
 # Hyperparameter ablation profiles. These are trained only for comparison in
-# outputs/hyperparameter_ablation_summary.csv. The main production model keeps
-# MODEL_PARAMS above unless you manually change MODEL_PARAMS.
+# outputs/hyperparameter_ablation_summary.csv.
 #
-# The deep/slow profiles test whether more trees, deeper interactions, and a
-# lower learning rate can learn subtler right-tail boom signals beyond the
-# current reference configuration.
+# The main question is now local: with depth=5 and learning_rate=0.008, where is
+# the best boosting-round sweet spot? Keep the main feature-weight profile fixed
+# across all rows so this table isolates training rounds. The old 2000-round
+# setting is kept as a legacy anchor for comparison.
 HYPERPARAMETER_ABLATION_PROFILES = {
-    "reference_2000_d4_lr0015": dict(MODEL_PARAMS),
-    "deep_slow_4000_d5_lr0008": {
+    "legacy_2000_d4_lr0015": {
         **MODEL_PARAMS,
-        "n_estimators": 4000,
-        "max_depth": 5,
-        "learning_rate": 0.008,
-        "min_child_weight": 3,
-        "reg_lambda": 2.00,
-        "subsample": 0.85,
-        "colsample_bytree": 0.90,
-        "colsample_bylevel": 0.85,
-        "colsample_bynode": 0.85,
+        "n_estimators": 2000,
+        "max_depth": 4,
+        "learning_rate": 0.015,
+        "min_child_weight": 4,
+        "reg_lambda": 1.50,
     },
-    "deeper_slower_6000_d6_lr0005": {
+    "rounds_3000_d5_lr0008": {
+        **MODEL_PARAMS,
+        "n_estimators": 3000,
+    },
+    "main_4000_d5_lr0008": dict(MODEL_PARAMS),
+    "rounds_5000_d5_lr0008": {
+        **MODEL_PARAMS,
+        "n_estimators": 5000,
+    },
+    "rounds_6000_d5_lr0008": {
         **MODEL_PARAMS,
         "n_estimators": 6000,
-        "max_depth": 6,
-        "learning_rate": 0.005,
-        "min_child_weight": 3,
-        "reg_alpha": 0.08,
-        "reg_lambda": 2.50,
-        "subsample": 0.82,
-        "colsample_bytree": 0.85,
-        "colsample_bylevel": 0.82,
-        "colsample_bynode": 0.82,
     },
 }
 
@@ -117,7 +118,8 @@ ABLATION_GROUPS = {
 #
 # XGBoost feature_weights are not linear coefficients. They bias column sampling
 # toward selected features; the tree booster still decides whether the split is
-# useful by gain.
+# useful by gain. Very high profiles below are stress tests for whether the model
+# should behave closer to a pure momentum ranker.
 FEATURE_WEIGHT_PROFILES = {
     "balanced_original": {
         "core_momentum": 1.25,
@@ -187,11 +189,6 @@ FEATURE_WEIGHT_PROFILES = {
             "mom_6m_acceleration": 3.50,
         },
     },
-    # Stress-test profile only. This intentionally pushes the strongest
-    # standalone momentum features into a very high column-sampling prior to
-    # test whether the model benefits from becoming much closer to a momentum
-    # ranker. It is not the default main profile unless MAIN_WEIGHT_PROFILE is
-    # explicitly changed below.
     "core_momentum_max_stress": {
         "core_momentum": 5.00,
         "relative_strength": 1.10,
@@ -219,6 +216,33 @@ FEATURE_WEIGHT_PROFILES = {
             "mom_6m_acceleration": 8.00,
         },
     },
+    "core_momentum_ranker_stress": {
+        "core_momentum": 8.00,
+        "relative_strength": 0.95,
+        "volatility_frequency": 0.85,
+        "liquidity_size": 0.80,
+        "other_momentum": 0.75,
+        "trend": 0.65,
+        "risk_drawdown": 0.60,
+        "volume_flow": 0.60,
+        "qqq_context": 0.55,
+        "etf_source": 0.50,
+        "unclassified": 0.75,
+        "_feature_overrides": {
+            "mom_4m": 20.00,
+            "mom_5m": 30.00,
+            "mom_6m": 25.00,
+            "core_mom_456_avg": 35.00,
+            "core_mom_456_min": 16.00,
+            "core_mom_456_max": 16.00,
+            "core_mom_456_std": 6.00,
+            "mom_4m_vs_6m": 8.00,
+            "mom_5m_vs_6m": 8.00,
+            "mom_6m_first3m": 12.00,
+            "mom_6m_last3m": 12.00,
+            "mom_6m_acceleration": 12.00,
+        },
+    },
 }
 MAIN_WEIGHT_PROFILE = "core_momentum_heavy"
 FEATURE_GROUP_WEIGHTS = FEATURE_WEIGHT_PROFILES[MAIN_WEIGHT_PROFILE]
@@ -242,4 +266,3 @@ OUTPUT_FILES = {
 }
 MAIN_MODEL_FILE = MODEL_DIR / "xgb_tail_event_classifier.json"
 FEATURE_LIST_FILE = MODEL_DIR / "selected_features.txt"
-README_FILE = PROJECT_ROOT / "README.md"
