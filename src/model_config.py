@@ -72,9 +72,15 @@ ABLATION_GROUPS = {
 }
 
 # Manual feature weights passed to XGBoost through feature_weights.
-# Main model uses momentum_boosted because this project is designed to detect
-# 1-3 month right-tail boom events, where core momentum should be the dominant
-# prior but not the only signal.
+#
+# The baseline table shows that raw 4m / 5m / 6m momentum and core_mom_456_avg
+# are very strong standalone strategies. For this right-tail boom detector, the
+# main profile therefore gives these exact core momentum features a much stronger
+# feature-sampling prior than generic context features.
+#
+# XGBoost feature_weights are not linear coefficients. They bias column sampling
+# toward selected features; the tree booster still decides whether the split is
+# useful by gain.
 FEATURE_WEIGHT_PROFILES = {
     "balanced_original": {
         "core_momentum": 1.25,
@@ -88,35 +94,64 @@ FEATURE_WEIGHT_PROFILES = {
         "qqq_context": 0.95,
         "etf_source": 0.90,
         "unclassified": 1.00,
+        "_feature_overrides": {},
     },
-    "momentum_boosted": {
-        "core_momentum": 1.60,
+    "core_momentum_heavy": {
+        "core_momentum": 2.20,
         "relative_strength": 1.25,
-        "volatility_frequency": 1.20,
-        "liquidity_size": 1.10,
-        "other_momentum": 1.10,
-        "trend": 1.00,
-        "risk_drawdown": 0.95,
-        "volume_flow": 0.95,
-        "qqq_context": 0.90,
-        "etf_source": 0.85,
-        "unclassified": 1.00,
-    },
-    "momentum_aggressive": {
-        "core_momentum": 2.00,
-        "relative_strength": 1.35,
-        "volatility_frequency": 1.25,
-        "liquidity_size": 1.10,
-        "other_momentum": 1.10,
-        "trend": 1.00,
+        "volatility_frequency": 1.15,
+        "liquidity_size": 1.05,
+        "other_momentum": 1.00,
+        "trend": 0.95,
         "risk_drawdown": 0.90,
         "volume_flow": 0.90,
         "qqq_context": 0.85,
         "etf_source": 0.80,
         "unclassified": 1.00,
+        "_feature_overrides": {
+            "mom_4m": 3.00,
+            "mom_5m": 3.50,
+            "mom_6m": 3.50,
+            "core_mom_456_avg": 4.00,
+            "core_mom_456_min": 3.00,
+            "core_mom_456_max": 3.00,
+            "core_mom_456_std": 2.20,
+            "mom_4m_vs_6m": 2.20,
+            "mom_5m_vs_6m": 2.20,
+            "mom_6m_first3m": 2.40,
+            "mom_6m_last3m": 2.40,
+            "mom_6m_acceleration": 2.60,
+        },
+    },
+    "core_momentum_ultra": {
+        "core_momentum": 3.00,
+        "relative_strength": 1.20,
+        "volatility_frequency": 1.10,
+        "liquidity_size": 1.00,
+        "other_momentum": 0.95,
+        "trend": 0.90,
+        "risk_drawdown": 0.85,
+        "volume_flow": 0.85,
+        "qqq_context": 0.80,
+        "etf_source": 0.75,
+        "unclassified": 1.00,
+        "_feature_overrides": {
+            "mom_4m": 4.00,
+            "mom_5m": 5.00,
+            "mom_6m": 5.00,
+            "core_mom_456_avg": 5.50,
+            "core_mom_456_min": 4.00,
+            "core_mom_456_max": 4.00,
+            "core_mom_456_std": 2.50,
+            "mom_4m_vs_6m": 2.80,
+            "mom_5m_vs_6m": 2.80,
+            "mom_6m_first3m": 3.20,
+            "mom_6m_last3m": 3.20,
+            "mom_6m_acceleration": 3.50,
+        },
     },
 }
-MAIN_WEIGHT_PROFILE = "momentum_boosted"
+MAIN_WEIGHT_PROFILE = "core_momentum_heavy"
 FEATURE_GROUP_WEIGHTS = FEATURE_WEIGHT_PROFILES[MAIN_WEIGHT_PROFILE]
 
 OUTPUT_FILES = {

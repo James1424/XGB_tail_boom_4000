@@ -50,6 +50,9 @@ def feature_group(feature: str) -> str:
 
 def manual_feature_weight(feature: str, group_weights: dict | None = None) -> float:
     weights = FEATURE_GROUP_WEIGHTS if group_weights is None else group_weights
+    feature_overrides = weights.get("_feature_overrides", {}) if isinstance(weights, dict) else {}
+    if feature in feature_overrides:
+        return float(feature_overrides[feature])
     return float(weights.get(feature_group(feature), weights.get("unclassified", 1.0)))
 
 
@@ -248,7 +251,12 @@ def feature_weight_ablation_summary(train, valid, test, features) -> pd.DataFram
         row = {
             "weight_profile": profile_name,
             "is_main_profile": profile_name == MAIN_WEIGHT_PROFILE,
-            "core_momentum_weight": group_weights.get("core_momentum", 1.0),
+            "core_momentum_group_weight": group_weights.get("core_momentum", 1.0),
+            "mom_4m_weight": manual_feature_weight("mom_4m", group_weights),
+            "mom_5m_weight": manual_feature_weight("mom_5m", group_weights),
+            "mom_6m_weight": manual_feature_weight("mom_6m", group_weights),
+            "core_mom_456_avg_weight": manual_feature_weight("core_mom_456_avg", group_weights),
+            "mom_6m_acceleration_weight": manual_feature_weight("mom_6m_acceleration", group_weights),
             "relative_strength_weight": group_weights.get("relative_strength", 1.0),
             "volatility_frequency_weight": group_weights.get("volatility_frequency", 1.0),
             "etf_source_weight": group_weights.get("etf_source", 1.0),
