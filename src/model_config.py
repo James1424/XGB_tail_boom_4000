@@ -41,11 +41,10 @@ TRAINING_CURVE_ROUNDS = list(range(100, 4001, 100))
 
 # Main model configuration.
 #
-# Previous ablations showed that the deep/slow 4000-round configuration beat
-# both the old 2000-round reference and the 6000-round stress test on realized
-# Top-3 strategy return. Therefore the production baseline is now fixed at
-# 4000 trees, depth 5, learning_rate 0.008. Future ablations should test around
-# this baseline instead of treating 2000 rounds as the reference.
+# Previous hyperparameter ablations showed that the deep/slow 4000-round
+# configuration beat the old 2000-round reference and the 6000-round stress test
+# on realized Top-3 strategy return. Therefore the production baseline is now
+# fixed at 4000 trees, depth 5, and learning_rate 0.008.
 MODEL_PARAMS = {
     "n_estimators": 4000,
     "max_depth": 5,
@@ -64,13 +63,11 @@ MODEL_PARAMS = {
     "tree_method": "hist",
 }
 
-# Hyperparameter ablation profiles. These are trained only for comparison in
-# outputs/hyperparameter_ablation_summary.csv.
+# Hyperparameter ablation profiles.
 #
-# The main question is now local: with depth=5 and learning_rate=0.008, where is
-# the best boosting-round sweet spot? Keep the main feature-weight profile fixed
-# across all rows so this table isolates training rounds. The old 2000-round
-# setting is kept as a legacy anchor for comparison.
+# Keep the main feature-weight profile fixed and test the local boosting-round
+# sweet spot around the new 4000-round baseline. The legacy 2000-round profile is
+# retained only as an old-reference anchor.
 HYPERPARAMETER_ABLATION_PROFILES = {
     "legacy_2000_d4_lr0015": {
         **MODEL_PARAMS,
@@ -111,84 +108,14 @@ ABLATION_GROUPS = {
 
 # Manual feature weights passed to XGBoost through feature_weights.
 #
-# The baseline table shows that raw 4m / 5m / 6m momentum and core_mom_456_avg
-# are very strong standalone strategies. For this right-tail boom detector, the
-# main profile therefore gives these exact core momentum features a much stronger
-# feature-sampling prior than generic context features.
-#
-# XGBoost feature_weights are not linear coefficients. They bias column sampling
-# toward selected features; the tree booster still decides whether the split is
-# useful by gain. Very high profiles below are stress tests for whether the model
-# should behave closer to a pure momentum ranker.
+# Important: XGBoost feature_weights are not linear coefficients. They bias
+# column sampling toward selected features; the booster still chooses splits by
+# gain. Here the former core_momentum_max_stress profile is intentionally kept as
+# the main/original profile. All lighter profiles from the previous experiment
+# were removed. The four additional profiles below are more aggressive stress
+# tests that try to push XGB closer to the strong standalone momentum baselines
+# such as baseline_mom_5m, baseline_core_mom_456_avg, and baseline_mom_4m.
 FEATURE_WEIGHT_PROFILES = {
-    "balanced_original": {
-        "core_momentum": 1.25,
-        "relative_strength": 1.15,
-        "volatility_frequency": 1.15,
-        "liquidity_size": 1.10,
-        "other_momentum": 1.05,
-        "trend": 1.00,
-        "risk_drawdown": 1.00,
-        "volume_flow": 0.95,
-        "qqq_context": 0.95,
-        "etf_source": 0.90,
-        "unclassified": 1.00,
-        "_feature_overrides": {},
-    },
-    "core_momentum_heavy": {
-        "core_momentum": 2.20,
-        "relative_strength": 1.25,
-        "volatility_frequency": 1.15,
-        "liquidity_size": 1.05,
-        "other_momentum": 1.00,
-        "trend": 0.95,
-        "risk_drawdown": 0.90,
-        "volume_flow": 0.90,
-        "qqq_context": 0.85,
-        "etf_source": 0.80,
-        "unclassified": 1.00,
-        "_feature_overrides": {
-            "mom_4m": 3.00,
-            "mom_5m": 3.50,
-            "mom_6m": 3.50,
-            "core_mom_456_avg": 4.00,
-            "core_mom_456_min": 3.00,
-            "core_mom_456_max": 3.00,
-            "core_mom_456_std": 2.20,
-            "mom_4m_vs_6m": 2.20,
-            "mom_5m_vs_6m": 2.20,
-            "mom_6m_first3m": 2.40,
-            "mom_6m_last3m": 2.40,
-            "mom_6m_acceleration": 2.60,
-        },
-    },
-    "core_momentum_ultra": {
-        "core_momentum": 3.00,
-        "relative_strength": 1.20,
-        "volatility_frequency": 1.10,
-        "liquidity_size": 1.00,
-        "other_momentum": 0.95,
-        "trend": 0.90,
-        "risk_drawdown": 0.85,
-        "volume_flow": 0.85,
-        "qqq_context": 0.80,
-        "etf_source": 0.75,
-        "unclassified": 1.00,
-        "_feature_overrides": {
-            "mom_4m": 4.00,
-            "mom_5m": 5.00,
-            "mom_6m": 5.00,
-            "core_mom_456_avg": 5.50,
-            "core_mom_456_min": 4.00,
-            "core_mom_456_max": 4.00,
-            "core_mom_456_std": 2.50,
-            "mom_4m_vs_6m": 2.80,
-            "mom_5m_vs_6m": 2.80,
-            "mom_6m_first3m": 3.20,
-            "mom_6m_last3m": 3.20,
-            "mom_6m_acceleration": 3.50,
-        },
-    },
     "core_momentum_max_stress": {
         "core_momentum": 5.00,
         "relative_strength": 1.10,
@@ -216,35 +143,116 @@ FEATURE_WEIGHT_PROFILES = {
             "mom_6m_acceleration": 8.00,
         },
     },
-    "core_momentum_ranker_stress": {
-        "core_momentum": 8.00,
-        "relative_strength": 0.95,
-        "volatility_frequency": 0.85,
-        "liquidity_size": 0.80,
-        "other_momentum": 0.75,
-        "trend": 0.65,
-        "risk_drawdown": 0.60,
-        "volume_flow": 0.60,
-        "qqq_context": 0.55,
-        "etf_source": 0.50,
-        "unclassified": 0.75,
+    "core_momentum_aggressive_1": {
+        "core_momentum": 7.00,
+        "relative_strength": 1.00,
+        "volatility_frequency": 0.90,
+        "liquidity_size": 0.85,
+        "other_momentum": 0.80,
+        "trend": 0.70,
+        "risk_drawdown": 0.65,
+        "volume_flow": 0.65,
+        "qqq_context": 0.60,
+        "etf_source": 0.55,
+        "unclassified": 0.90,
         "_feature_overrides": {
-            "mom_4m": 20.00,
-            "mom_5m": 30.00,
-            "mom_6m": 25.00,
-            "core_mom_456_avg": 35.00,
+            "mom_4m": 16.00,
+            "mom_5m": 24.00,
+            "mom_6m": 24.00,
+            "core_mom_456_avg": 32.00,
             "core_mom_456_min": 16.00,
             "core_mom_456_max": 16.00,
-            "core_mom_456_std": 6.00,
-            "mom_4m_vs_6m": 8.00,
-            "mom_5m_vs_6m": 8.00,
+            "core_mom_456_std": 7.00,
+            "mom_4m_vs_6m": 7.00,
+            "mom_5m_vs_6m": 7.00,
             "mom_6m_first3m": 12.00,
             "mom_6m_last3m": 12.00,
             "mom_6m_acceleration": 12.00,
         },
     },
+    "core_momentum_aggressive_2": {
+        "core_momentum": 10.00,
+        "relative_strength": 0.90,
+        "volatility_frequency": 0.80,
+        "liquidity_size": 0.75,
+        "other_momentum": 0.70,
+        "trend": 0.60,
+        "risk_drawdown": 0.55,
+        "volume_flow": 0.55,
+        "qqq_context": 0.50,
+        "etf_source": 0.45,
+        "unclassified": 0.80,
+        "_feature_overrides": {
+            "mom_4m": 25.00,
+            "mom_5m": 38.00,
+            "mom_6m": 35.00,
+            "core_mom_456_avg": 50.00,
+            "core_mom_456_min": 25.00,
+            "core_mom_456_max": 25.00,
+            "core_mom_456_std": 9.00,
+            "mom_4m_vs_6m": 10.00,
+            "mom_5m_vs_6m": 10.00,
+            "mom_6m_first3m": 18.00,
+            "mom_6m_last3m": 18.00,
+            "mom_6m_acceleration": 18.00,
+        },
+    },
+    "core_momentum_aggressive_3": {
+        "core_momentum": 14.00,
+        "relative_strength": 0.80,
+        "volatility_frequency": 0.70,
+        "liquidity_size": 0.65,
+        "other_momentum": 0.60,
+        "trend": 0.50,
+        "risk_drawdown": 0.45,
+        "volume_flow": 0.45,
+        "qqq_context": 0.40,
+        "etf_source": 0.35,
+        "unclassified": 0.70,
+        "_feature_overrides": {
+            "mom_4m": 40.00,
+            "mom_5m": 60.00,
+            "mom_6m": 55.00,
+            "core_mom_456_avg": 80.00,
+            "core_mom_456_min": 40.00,
+            "core_mom_456_max": 40.00,
+            "core_mom_456_std": 12.00,
+            "mom_4m_vs_6m": 15.00,
+            "mom_5m_vs_6m": 15.00,
+            "mom_6m_first3m": 28.00,
+            "mom_6m_last3m": 28.00,
+            "mom_6m_acceleration": 28.00,
+        },
+    },
+    "core_momentum_pure_ranker_stress": {
+        "core_momentum": 20.00,
+        "relative_strength": 0.70,
+        "volatility_frequency": 0.55,
+        "liquidity_size": 0.50,
+        "other_momentum": 0.50,
+        "trend": 0.35,
+        "risk_drawdown": 0.30,
+        "volume_flow": 0.30,
+        "qqq_context": 0.25,
+        "etf_source": 0.20,
+        "unclassified": 0.50,
+        "_feature_overrides": {
+            "mom_4m": 60.00,
+            "mom_5m": 100.00,
+            "mom_6m": 90.00,
+            "core_mom_456_avg": 130.00,
+            "core_mom_456_min": 60.00,
+            "core_mom_456_max": 60.00,
+            "core_mom_456_std": 18.00,
+            "mom_4m_vs_6m": 22.00,
+            "mom_5m_vs_6m": 22.00,
+            "mom_6m_first3m": 45.00,
+            "mom_6m_last3m": 45.00,
+            "mom_6m_acceleration": 45.00,
+        },
+    },
 }
-MAIN_WEIGHT_PROFILE = "core_momentum_heavy"
+MAIN_WEIGHT_PROFILE = "core_momentum_max_stress"
 FEATURE_GROUP_WEIGHTS = FEATURE_WEIGHT_PROFILES[MAIN_WEIGHT_PROFILE]
 
 OUTPUT_FILES = {
