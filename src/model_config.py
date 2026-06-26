@@ -4,6 +4,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
 MODEL_DIR = PROJECT_ROOT / "models"
+README_FILE = PROJECT_ROOT / "README.md"
 
 # Full training panel path. In the integrated workflow, build_panel writes this file to outputs/.
 # IMPORTANT: panel_head_20000.csv is only a human-readable sample and must never be used for training.
