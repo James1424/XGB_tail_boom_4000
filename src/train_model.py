@@ -224,7 +224,11 @@ def five_seed_stability_and_importance(train, valid, test, latest, features):
     latest_scores["five_seed_score_std"] = latest_scores[seed_cols].std(axis=1)
 
     imp_mat = pd.concat(importances, axis=1)
-    weights = manual_feature_weight_table(features).set_index("feature")
+    # Manual weights also have an original feature-order column named "index".
+    # Drop it before merging, then create a fresh rank index after sorting by
+    # five-seed mean importance. Otherwise pandas raises:
+    # ValueError: cannot insert index, already exists.
+    weights = manual_feature_weight_table(features).drop(columns=["index"], errors="ignore")
     imp = pd.DataFrame({
         "feature": imp_mat.index,
         "mean": imp_mat.mean(axis=1).values,
@@ -232,7 +236,7 @@ def five_seed_stability_and_importance(train, valid, test, latest, features):
         "min": imp_mat.min(axis=1).values,
         "max": imp_mat.max(axis=1).values,
     })
-    imp = imp.merge(weights.reset_index(), on="feature", how="left")
+    imp = imp.merge(weights, on="feature", how="left")
     imp = imp.sort_values("mean", ascending=False).reset_index(drop=True)
     imp.insert(0, "index", range(1, len(imp) + 1))
     imp = imp[["index", "feature", "tier", "feature_group", "feature_weight", "mean", "std", "min", "max"]]
