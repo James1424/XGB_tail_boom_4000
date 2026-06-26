@@ -23,6 +23,10 @@ on:
         description: "Set true for a quick smoke run"
         required: false
         default: "false"
+      skip_hyperparam_ablation:
+        description: "Set true to skip slower deep-tree hyperparameter ablation"
+        required: false
+        default: "false"
   schedule:
     - cron: "0 7 * * 0"
 
@@ -60,7 +64,10 @@ jobs:
         run: |
           SKIP=""
           if [ "${{ github.event.inputs.skip_ablation || 'false' }}" = "true" ]; then
-            SKIP="--skip-ablation"
+            SKIP="$SKIP --skip-ablation"
+          fi
+          if [ "${{ github.event.inputs.skip_hyperparam_ablation || 'false' }}" = "true" ]; then
+            SKIP="$SKIP --skip-hyperparam-ablation"
           fi
           python -m src.train_model --rounds "${{ github.event.inputs.rounds || '100' }}" $SKIP
 
@@ -113,6 +120,7 @@ jobs:
             outputs/latest_live_boom_candidates.csv
             outputs/strategy_baseline_comparison.csv
             outputs/feature_weight_ablation_summary.csv
+            outputs/hyperparameter_ablation_summary.csv
             outputs/recent_xgb_top3_backtest_months.csv
             outputs/ablation_ranked_summary.csv
             outputs/five_seed_training_stability.csv
