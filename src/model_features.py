@@ -4,7 +4,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from .model_config import ID_COLUMNS, LEAKAGE_COLUMNS, PANEL_FALLBACKS, PANEL_FILE
+from .model_config import ID_COLUMNS, LEAKAGE_COLUMNS, MIN_TRAINING_PANEL_ROWS, PANEL_FALLBACKS, PANEL_FILE
 
 
 def find_panel_file() -> Path:
@@ -13,14 +13,21 @@ def find_panel_file() -> Path:
         if p.exists() and p.stat().st_size > 0:
             return p
     raise FileNotFoundError(
-        "No panel file found. Put clean_monthly_panel.csv at data/clean_monthly_panel.csv, "
-        "or place a sample at outputs/panel_head_20000.csv."
+        "No full training panel found. The model requires outputs/clean_monthly_panel.csv "
+        "from the integrated build step, or data/clean_monthly_panel.csv for local/manual runs. "
+        "outputs/panel_head_20000.csv is only a display sample and is intentionally not accepted for training."
     )
 
 
 def load_panel() -> pd.DataFrame:
     path = find_panel_file()
     df = pd.read_csv(path)
+    if len(df) < MIN_TRAINING_PANEL_ROWS:
+        raise ValueError(
+            f"Training panel at {path} has only {len(df):,} rows. "
+            f"Expected at least {MIN_TRAINING_PANEL_ROWS:,}. "
+            "This usually means a sample file such as panel_head_20000.csv was used accidentally."
+        )
     if "month" not in df.columns or "ticker" not in df.columns:
         raise ValueError("Panel must contain month and ticker columns.")
     df["month"] = pd.to_datetime(df["month"])

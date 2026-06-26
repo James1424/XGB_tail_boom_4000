@@ -5,13 +5,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
 MODEL_DIR = PROJECT_ROOT / "models"
 
-# Preferred full panel path. In the integrated workflow, build_panel writes this file to outputs/.
+# Full training panel path. In the integrated workflow, build_panel writes this file to outputs/.
+# IMPORTANT: panel_head_20000.csv is only a human-readable sample and must never be used for training.
 PANEL_FILE = OUTPUT_DIR / "clean_monthly_panel.csv"
 PANEL_FALLBACKS = [
     DATA_DIR / "clean_monthly_panel.csv",
-    PROJECT_ROOT / "outputs" / "panel_head_20000.csv",
-    DATA_DIR / "panel_head_20000.csv",
 ]
+MIN_TRAINING_PANEL_ROWS = 30000
 
 TARGET_LABEL = "label_boom30_top10_1_3m"
 AUX_LABELS = [
