@@ -150,6 +150,38 @@ FEATURE_WEIGHT_PROFILES = {
             "mom_6m_acceleration": 3.50,
         },
     },
+    # Stress-test profile only. This intentionally pushes the strongest
+    # standalone momentum features into a very high column-sampling prior to
+    # test whether the model benefits from becoming much closer to a momentum
+    # ranker. It is not the default main profile unless MAIN_WEIGHT_PROFILE is
+    # explicitly changed below.
+    "core_momentum_max_stress": {
+        "core_momentum": 5.00,
+        "relative_strength": 1.10,
+        "volatility_frequency": 1.00,
+        "liquidity_size": 0.95,
+        "other_momentum": 0.90,
+        "trend": 0.80,
+        "risk_drawdown": 0.75,
+        "volume_flow": 0.75,
+        "qqq_context": 0.70,
+        "etf_source": 0.65,
+        "unclassified": 1.00,
+        "_feature_overrides": {
+            "mom_4m": 10.00,
+            "mom_5m": 15.00,
+            "mom_6m": 15.00,
+            "core_mom_456_avg": 20.00,
+            "core_mom_456_min": 10.00,
+            "core_mom_456_max": 10.00,
+            "core_mom_456_std": 5.00,
+            "mom_4m_vs_6m": 5.00,
+            "mom_5m_vs_6m": 5.00,
+            "mom_6m_first3m": 8.00,
+            "mom_6m_last3m": 8.00,
+            "mom_6m_acceleration": 8.00,
+        },
+    },
 }
 MAIN_WEIGHT_PROFILE = "core_momentum_heavy"
 FEATURE_GROUP_WEIGHTS = FEATURE_WEIGHT_PROFILES[MAIN_WEIGHT_PROFILE]
