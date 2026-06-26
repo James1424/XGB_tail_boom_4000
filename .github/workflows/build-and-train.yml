@@ -74,6 +74,9 @@ jobs:
       - name: Update README
         run: python -m src.update_model_readme
 
+      - name: Archive README snapshot
+        run: python -m src.archive_readme
+
       - name: Upload full panel artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -101,6 +104,7 @@ jobs:
           commit_message: "Build panel and update tail boom model reports"
           file_pattern: >
             README.md
+            readme_archive/*.md
             data/seed_universe.csv
             data/seed_universe_sources_long.csv
             data/holding_source_failures.csv
