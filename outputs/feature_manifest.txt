@@ -3,10 +3,10 @@
 This file lists model input features kept after missingness filtering.
 Future-return and tail-label columns are targets/evaluation fields and must not be used as model input features.
 
-Rows: 51,516
+Rows: 51,815
 Columns: 126
 Tickers: 424
-Months: 126
+Months: 127
 Kept features: 110
 Dropped features: 0
 
@@ -72,9 +72,9 @@ Dropped features: 0
 - ret_lag_6m_std [sequence_path]
 - mom_2m [other_momentum]
 - ma20_slope_1m [trend]
-- volume_ratio_3m [volume_flow]
 - volatility_3m [risk_drawdown]
 - volatility_1m_to_3m [vol_structure]
+- volume_ratio_3m [volume_flow]
 - avg_abs_daily_return_3m [volatility_amplitude_frequency]
 - ma10_slope_1m [trend]
 - drawdown_3m [risk_drawdown]

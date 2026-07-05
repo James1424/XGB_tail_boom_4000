@@ -59,9 +59,9 @@ ret_lag_2m
 ret_lag_6m_std
 mom_2m
 ma20_slope_1m
-volume_ratio_3m
 volatility_3m
 volatility_1m_to_3m
+volume_ratio_3m
 avg_abs_daily_return_3m
 ma10_slope_1m
 drawdown_3m
