@@ -37,8 +37,8 @@ index,feature,tier,feature_group,feature_weight
 36,ret_lag_3m,tier_3_standard,unclassified,1.0
 37,rel_mom_3m_vs_qqq,tier_4_downweighted_context,other_momentum,0.9
 38,mom_3m,tier_4_downweighted_context,other_momentum,0.9
-39,volatility_6m,tier_4_downweighted_context,risk_drawdown,0.75
-40,return_vol_ratio_3m,tier_4_downweighted_context,risk_drawdown,0.75
+39,return_vol_ratio_3m,tier_4_downweighted_context,risk_drawdown,0.75
+40,volatility_6m,tier_4_downweighted_context,risk_drawdown,0.75
 41,volatility_1m_to_6m,tier_4_downweighted_context,risk_drawdown,0.75
 42,volatility_3m_to_6m,tier_4_downweighted_context,risk_drawdown,0.75
 43,avg_abs_daily_return_6m,tier_3_standard,volatility_frequency,1.0
