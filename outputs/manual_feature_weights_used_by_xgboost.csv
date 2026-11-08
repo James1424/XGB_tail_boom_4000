@@ -13,9 +13,9 @@ index,feature,tier,feature_group,feature_weight
 12,ret_lag_6m,tier_3_standard,unclassified,1.0
 13,rel_mom_6m_vs_qqq,tier_1_core_tail,core_momentum,5.0
 14,mom_3m_vs_6m,tier_4_downweighted_context,other_momentum,0.9
-15,return_vol_ratio_6m,tier_4_downweighted_context,risk_drawdown,0.75
-16,drawdown_12m,tier_4_downweighted_context,risk_drawdown,0.75
-17,drawdown_12m_abs,tier_4_downweighted_context,risk_drawdown,0.75
+15,drawdown_12m,tier_4_downweighted_context,risk_drawdown,0.75
+16,drawdown_12m_abs,tier_4_downweighted_context,risk_drawdown,0.75
+17,return_vol_ratio_6m,tier_4_downweighted_context,risk_drawdown,0.75
 18,ma100_slope_1m,tier_4_downweighted_context,trend,0.8
 19,volume_change_3m,tier_4_downweighted_context,volume_flow,0.75
 20,dollar_volume_change_3m,tier_4_downweighted_context,liquidity_size,0.95
